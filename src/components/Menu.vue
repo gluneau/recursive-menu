@@ -21,6 +21,7 @@ import { defineComponent, onMounted, ref } from 'vue';
 import SubMenu from './SubMenu.vue';
 import { api } from 'boot/axios';
 import { MenuItem, MenuItemAttributes } from './models';
+import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
   name: 'MenuDesktop',
@@ -30,7 +31,7 @@ export default defineComponent({
   setup() {
     const menus = ref<MenuItem[]>([]);
     const topMenus = ref<MenuItem[]>([]);
-    const locale = ref<string>('en');
+    const { locale } = useI18n({ useScope: 'global' });
 
     onMounted(async () => {
       try {
