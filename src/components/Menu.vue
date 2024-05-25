@@ -34,9 +34,16 @@ export default defineComponent({
 
     onMounted(async () => {
       try {
-        const response = await api.get(
-          '/menus?populate[0]=children&populate[children][populate][0]=children&populate[children][populate][children][populate][0]=children&populate[children][populate][children][populate][children][populate][0]=children&populate[children][populate][children][populate][children][populate][children][populate][0]=children&populate[children][populate][children][populate][children][populate][children][populate][children][populate][0]=children&populate[children][populate][children][populate][children][populate][children][populate][children][populate][children][populate][0]=children&pagination[pageSize]=100'
-        );
+        const query = new URLSearchParams({
+          'pagination[pageSize]': '100',
+        });
+        for (let i = 0; i < 7; i++) {
+          query.append(
+            `populate${'[children][populate]'.repeat(i)}[0]`,
+            'children'
+          );
+        }
+        const response = await api.get(`/menus?${query}`);
         menus.value = response.data.data;
         filterTopMenus(menus.value);
       } catch (error) {
