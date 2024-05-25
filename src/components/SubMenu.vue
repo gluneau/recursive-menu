@@ -5,7 +5,7 @@
         clickable
         v-for="menu in menuItem.attributes.children.data"
         :key="menu.id"
-        @click="close(menu)"
+        @click="navigateToCategory(menu)"
       >
         <q-item-section>{{ getLocalizedTitle(menu) }}</q-item-section>
         <template v-if="menu.attributes.children.data.length > 0">
@@ -27,7 +27,9 @@
 
 <script lang="ts">
 import { defineComponent, PropType, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { MenuItem, MenuItemAttributes } from './models';
+import { useI18n } from 'vue-i18n';
 import type { QMenu } from 'quasar';
 
 export default defineComponent({
@@ -43,8 +45,9 @@ export default defineComponent({
   },
   emits: ['close'],
   setup(props, { emit }) {
+    const { locale } = useI18n({ useScope: 'global' });
     const qMenu = ref<QMenu>();
-    const locale = ref<string>('en');
+    const router = useRouter();
 
     function getLocalizedTitle(menu: MenuItem): string {
       const titleKey = `title_${locale.value}`;
@@ -58,16 +61,21 @@ export default defineComponent({
       }
     }
 
-    console.log(
-      props.level,
-      props.menuItem.attributes.title_en,
-      props.menuItem.attributes.children.data
-    );
+    function generateCategoryUrl(menu: MenuItem): string {
+      const title = menu.attributes.title_en.toLowerCase().replace(/ /g, '+');
+      return `category/${title}`;
+    }
+
+    function navigateToCategory(menu: MenuItem) {
+      const url = generateCategoryUrl(menu);
+      router.push(url);
+    }
 
     return {
       qMenu,
       close,
       getLocalizedTitle,
+      navigateToCategory,
     };
   },
 });
