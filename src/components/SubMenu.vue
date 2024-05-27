@@ -1,5 +1,11 @@
 <template>
-  <q-menu ref="qMenu" :anchor="anchor" :self="self">
+  <q-menu
+    ref="qMenu"
+    :anchor="anchor"
+    :self="self"
+    @show="onShow"
+    @hide="onHide"
+  >
     <q-list style="min-width: 100px">
       <q-item
         clickable
@@ -13,11 +19,11 @@
             <q-icon name="keyboard_arrow_right" />
           </q-item-section>
           <SubMenu
+            ref="subMenu"
             :menuItem="menu"
             :level="level + 1"
             anchor="top end"
             self="top start"
-            @close="close"
           />
         </template>
       </q-item>
@@ -26,25 +32,47 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, ref } from 'vue';
+import {
+  defineComponent,
+  PropType,
+  ref,
+  inject,
+  getCurrentInstance,
+} from 'vue';
 import { useRouter } from 'vue-router';
 import { MenuItem, MenuItemAttributes } from './models';
 import { useI18n } from 'vue-i18n';
+import { registerMenuKey, unregisterMenuKey, closeMenuKey } from './Menu.vue';
 import type { QMenu } from 'quasar';
 
-export default defineComponent({
+const SubMenuComponent = defineComponent({
   name: 'SubMenu',
   props: {
     menuItem: {
       type: Object as PropType<MenuItem>,
       required: true,
     },
-    anchor: Object as PropType<QMenu['anchor']>,
-    self: Object as PropType<QMenu['self']>,
+    anchor: String as PropType<QMenu['anchor']>,
+    self: String as PropType<QMenu['self']>,
     level: { type: Number, required: true },
   },
-  emits: ['close'],
+  emits: ['show', 'hide'],
   setup(props, { emit }) {
+    const subMenu = ref();
+    const registerMenu = inject(registerMenuKey);
+    const unregisterMenu = inject(unregisterMenuKey);
+    const closeMenu = inject(closeMenuKey);
+
+    const vm = getCurrentInstance();
+    function onShow() {
+      emit('show');
+      registerMenu?.(props.menuItem, vm?.proxy as never);
+    }
+    function onHide() {
+      emit('show');
+      unregisterMenu?.(props.menuItem);
+    }
+
     const { locale } = useI18n({ useScope: 'global' });
     const qMenu = ref<QMenu>();
     const router = useRouter();
@@ -54,11 +82,12 @@ export default defineComponent({
       return menu.attributes[titleKey as keyof MenuItemAttributes] as string;
     }
 
-    function close(menu?: MenuItem) {
-      if (!menu || !menu.attributes.children.data.length) {
-        qMenu.value?.hide();
-        emit('close');
-      }
+    function hide() {
+      qMenu.value?.hide();
+    }
+
+    function show() {
+      qMenu.value?.show();
     }
 
     function generateCategoryUrl(menu: MenuItem): string {
@@ -67,16 +96,29 @@ export default defineComponent({
     }
 
     function navigateToCategory(menu: MenuItem) {
-      const url = generateCategoryUrl(menu);
-      router.push(url);
+      if (!menu.attributes.children.data.length) {
+        if (false) {
+          const url = generateCategoryUrl(menu);
+          router.push(url);
+        } else {
+          closeMenu?.();
+        }
+      }
     }
 
     return {
       qMenu,
-      close,
+      hide,
+      show,
+      subMenu,
+      onShow,
+      onHide,
       getLocalizedTitle,
       navigateToCategory,
     };
   },
 });
+
+export type SubMenuInstance = InstanceType<typeof SubMenuComponent>;
+export default SubMenuComponent;
 </script>

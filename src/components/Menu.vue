@@ -12,23 +12,31 @@
       >
         <SubMenu :menuItem="menu" :level="0" />
       </q-btn>
+      <q-breadcrumbs v-if="menuTree?.length">
+        <q-breadcrumbs-el
+          v-for="{ item } in menuTree"
+          :key="item.id"
+          :label="getLocalizedTitle(item)"
+        />
+      </q-breadcrumbs>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue';
-import SubMenu from './SubMenu.vue';
+import { defineComponent, onMounted, ref, provide, InjectionKey } from 'vue';
+import SubMenu, { SubMenuInstance } from './SubMenu.vue';
 import { api } from 'boot/axios';
 import { MenuItem, MenuItemAttributes } from './models';
 import { useI18n } from 'vue-i18n';
 
-export default defineComponent({
+const MenuComponent = defineComponent({
   name: 'MenuDesktop',
   components: {
     SubMenu,
   },
   setup() {
+    const menuTree = ref<{ item: MenuItem; el: SubMenuInstance }[]>([]);
     const menus = ref<MenuItem[]>([]);
     const topMenus = ref<MenuItem[]>([]);
     const { locale } = useI18n({ useScope: 'global' });
@@ -85,11 +93,56 @@ export default defineComponent({
       topMenus.value = allMenus.filter((menu) => !subMenuIds.has(menu.id));
     }
 
+    function registerMenu(item: MenuItem, el: SubMenuInstance) {
+      menuTree.value?.push({ item, el });
+    }
+
+    function unregisterMenu(item: MenuItem) {
+      const index = menuTree.value?.findIndex((i) => i.item.id === item.id);
+      if (index && index !== -1) {
+        console.log(index, menuTree.value.length);
+        menuTree.value?.splice(index, menuTree.value.length);
+      }
+    }
+
+    function closeMenu(item?: MenuItem) {
+      if (!menuTree.value || !menuTree.value.length) {
+        return;
+      }
+      let index = 0;
+      if (item?.id) {
+        index = menuTree.value.findIndex((i) => i.item.id === item.id);
+      }
+      if (index !== -1) {
+        menuTree.value[index].el.hide();
+      }
+      if (index === 0) {
+        menuTree.value = [];
+      }
+    }
+
+    provide(registerMenuKey, registerMenu);
+    provide(unregisterMenuKey, unregisterMenu);
+    provide(closeMenuKey, closeMenu);
+
     return {
       menus,
       topMenus,
       getLocalizedTitle,
+      menuTree,
+      registerMenu,
+      unregisterMenu,
+      closeMenu,
     };
   },
 });
+
+export type MenuInstance = InstanceType<typeof MenuComponent>;
+export const registerMenuKey: InjectionKey<MenuInstance['registerMenu']> =
+  Symbol('register-menu-key');
+export const unregisterMenuKey: InjectionKey<MenuInstance['unregisterMenu']> =
+  Symbol('unregister-menu-key');
+export const closeMenuKey: InjectionKey<MenuInstance['closeMenu']> =
+  Symbol('close-menu-key');
+export default MenuComponent;
 </script>
