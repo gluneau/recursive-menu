@@ -9,10 +9,17 @@
         unelevated
         dense
         :label="getLocalizedTitle(menu)"
+        @mouseenter="onEnter(menu)"
+        @mouseleave="onLeave(menu)"
       >
-        <SubMenu :menuItem="menu" :level="0" />
+        <SubMenu
+          :ref="(el: SubMenuInstance) => menuEls[menu.id] = el"
+          :menuItem="menu"
+          :level="0"
+          @enter="cancelMenuClose(menu)"
+        />
       </q-btn>
-      <q-breadcrumbs v-if="menuTree?.length">
+      <q-breadcrumbs>
         <q-breadcrumbs-el
           v-for="{ item } in menuTree"
           :key="item.id"
@@ -24,7 +31,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, provide, InjectionKey } from 'vue';
+import {
+  defineComponent,
+  onMounted,
+  ref,
+  provide,
+  InjectionKey,
+  toRef,
+} from 'vue';
 import SubMenu, { SubMenuInstance } from './SubMenu.vue';
 import { api } from 'boot/axios';
 import { MenuItem, MenuItemAttributes } from './models';
@@ -35,7 +49,17 @@ const MenuComponent = defineComponent({
   components: {
     SubMenu,
   },
-  setup() {
+  props: {
+    openOnHover: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup(props) {
+    const timeout = ref<Record<number, number>>({});
+    const openOnHover = toRef(props, 'openOnHover');
+    const menuEls = ref<Record<number, SubMenuInstance>>({});
+
     const menuTree = ref<{ item: MenuItem; el: SubMenuInstance }[]>([]);
     const menus = ref<MenuItem[]>([]);
     const topMenus = ref<MenuItem[]>([]);
@@ -121,18 +145,47 @@ const MenuComponent = defineComponent({
       }
     }
 
+    function onEnter(menu: MenuItem) {
+      if (openOnHover.value) {
+        closeMenu();
+        requestAnimationFrame(function () {
+          menuEls.value[menu.id]?.show();
+        });
+      }
+    }
+
+    function onLeave(menu: MenuItem) {
+      if (openOnHover.value) {
+        const el = menuEls.value[menu.id];
+        timeout.value[menu.id] = requestAnimationFrame(function () {
+          el.hide();
+        });
+      }
+    }
+
+    function cancelMenuClose(menu: MenuItem) {
+      if (timeout.value[menu.id]) {
+        cancelAnimationFrame(timeout.value[menu.id]);
+        delete timeout.value[menu.id];
+      }
+    }
+
     provide(registerMenuKey, registerMenu);
     provide(unregisterMenuKey, unregisterMenu);
     provide(closeMenuKey, closeMenu);
 
     return {
       menus,
+      menuEls,
       topMenus,
       getLocalizedTitle,
       menuTree,
       registerMenu,
       unregisterMenu,
       closeMenu,
+      onEnter,
+      onLeave,
+      cancelMenuClose,
     };
   },
 });

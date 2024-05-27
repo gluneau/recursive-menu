@@ -3,6 +3,7 @@
     ref="qMenu"
     :anchor="anchor"
     :self="self"
+    @mouseenter="$emit('enter')"
     @show="onShow"
     @hide="onHide"
   >
@@ -56,7 +57,7 @@ const SubMenuComponent = defineComponent({
     self: String as PropType<QMenu['self']>,
     level: { type: Number, required: true },
   },
-  emits: ['show', 'hide'],
+  emits: ['show', 'hide', 'enter'],
   setup(props, { emit }) {
     const subMenu = ref();
     const registerMenu = inject(registerMenuKey);
@@ -65,8 +66,10 @@ const SubMenuComponent = defineComponent({
 
     const vm = getCurrentInstance();
     function onShow() {
-      emit('show');
-      registerMenu?.(props.menuItem, vm?.proxy as never);
+      if (props.menuItem.attributes.children.data) {
+        emit('show');
+        registerMenu?.(props.menuItem, vm?.proxy as never);
+      }
     }
     function onHide() {
       emit('show');
