@@ -9,26 +9,60 @@
         unelevated
         dense
         :label="getLocalizedTitle(menu)"
+        @mouseenter="onEnter(menu, closeMenu)"
+        @mouseleave="onLeave(menu)"
       >
-        <SubMenu :menuItem="menu" :level="0" />
+        <SubMenu
+          :ref="(el: never) => registerEl(menu.id, el)"
+          :menuItem="menu"
+          :level="0"
+          :open-on-hover="openOnHover"
+          @enter="cancelMenuClose(menu)"
+        />
       </q-btn>
+      <q-breadcrumbs>
+        <q-breadcrumbs-el
+          v-for="{ item } in menuTree"
+          :key="item.id"
+          :label="getLocalizedTitle(item)"
+        />
+      </q-breadcrumbs>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue';
-import SubMenu from './SubMenu.vue';
+import {
+  defineComponent,
+  onMounted,
+  ref,
+  provide,
+  InjectionKey,
+  toRef,
+} from 'vue';
+import SubMenu, { SubMenuInstance } from './SubMenu.vue';
 import { api } from 'boot/axios';
 import { MenuItem, MenuItemAttributes } from './models';
 import { useI18n } from 'vue-i18n';
+import { useOnHover } from 'src/composables/menu';
 
-export default defineComponent({
+const MenuComponent = defineComponent({
   name: 'MenuDesktop',
   components: {
     SubMenu,
   },
-  setup() {
+  props: {
+    openOnHover: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup(props) {
+    const openOnHover = toRef(props, 'openOnHover');
+    const { menuEls, registerEl, onEnter, onLeave, cancelMenuClose } =
+      useOnHover(openOnHover);
+
+    const menuTree = ref<{ item: MenuItem; el: SubMenuInstance }[]>([]);
     const menus = ref<MenuItem[]>([]);
     const topMenus = ref<MenuItem[]>([]);
     const { locale } = useI18n({ useScope: 'global' });
@@ -85,11 +119,72 @@ export default defineComponent({
       topMenus.value = allMenus.filter((menu) => !subMenuIds.has(menu.id));
     }
 
+    function registerMenu(item: MenuItem, el: SubMenuInstance) {
+      menuTree.value?.push({ item, el });
+    }
+
+    function unregisterMenu(item: MenuItem) {
+      const index = menuTree.value?.findIndex((i) => i.item.id === item.id);
+      if (index && index !== -1) {
+        console.log(index, menuTree.value.length);
+        menuTree.value?.splice(index, menuTree.value.length);
+      }
+    }
+
+    function closeMenu(item?: MenuItem) {
+      if (!menuTree.value || !menuTree.value.length) {
+        return;
+      }
+      let index = 0;
+      if (item?.id) {
+        index = menuTree.value.findIndex((i) => i.item.id === item.id);
+      }
+      if (index !== -1) {
+        menuTree.value[index].el.hide();
+      }
+      if (index === 0) {
+        menuTree.value = [];
+      }
+    }
+
+    function resetMenuTimeouts() {
+      for (const { el } of menuTree.value) {
+        el.clearTimeout();
+      }
+    }
+
+    provide(registerMenuKey, registerMenu);
+    provide(unregisterMenuKey, unregisterMenu);
+    provide(closeMenuKey, closeMenu);
+    provide(resetMenuTimeoutsKey, resetMenuTimeouts);
+
     return {
       menus,
+      menuEls,
       topMenus,
       getLocalizedTitle,
+      menuTree,
+      registerMenu,
+      unregisterMenu,
+      closeMenu,
+      registerEl,
+      onEnter,
+      onLeave,
+      cancelMenuClose,
+      resetMenuTimeouts,
     };
   },
 });
+
+export type MenuInstance = InstanceType<typeof MenuComponent>;
+export const resetMenuTimeoutsKey: InjectionKey<
+  MenuInstance['resetMenuTimeouts']
+> = Symbol('reset-menu-timeouts-key');
+export const registerMenuKey: InjectionKey<MenuInstance['registerMenu']> =
+  Symbol('register-menu-key');
+export const unregisterMenuKey: InjectionKey<MenuInstance['unregisterMenu']> =
+  Symbol('unregister-menu-key');
+export const closeMenuKey: InjectionKey<MenuInstance['closeMenu']> =
+  Symbol('close-menu-key');
+export default MenuComponent;
 </script>

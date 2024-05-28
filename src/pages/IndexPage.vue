@@ -1,6 +1,6 @@
 <template>
   <q-page class="row items-center justify-evenly">
-    <MenuDesktop />
+    <MenuDesktop open-on-hover />
     <example-component
       title="Example component"
       active
