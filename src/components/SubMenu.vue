@@ -151,13 +151,11 @@ const SubMenuComponent = defineComponent({
     }
 
     function navigateToCategory(menu: MenuItem) {
-      if (!menu.attributes.children.data.length) {
-        if (false) {
-          const url = generateCategoryUrl(menu);
-          router.push(url);
-        } else {
-          closeMenu?.();
-        }
+      if (openOnHover.value || !menu.attributes.children.data.length) {
+        const url = generateCategoryUrl(menu);
+        router.push(url);
+      } else {
+        closeMenu?.();
       }
     }
 
