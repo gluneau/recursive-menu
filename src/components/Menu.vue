@@ -9,13 +9,14 @@
         unelevated
         dense
         :label="getLocalizedTitle(menu)"
-        @mouseenter="onEnter(menu)"
+        @mouseenter="onEnter(menu, closeMenu)"
         @mouseleave="onLeave(menu)"
       >
         <SubMenu
-          :ref="(el: SubMenuInstance) => menuEls[menu.id] = el"
+          :ref="(el: never) => registerEl(menu.id, el)"
           :menuItem="menu"
           :level="0"
+          :open-on-hover="openOnHover"
           @enter="cancelMenuClose(menu)"
         />
       </q-btn>
@@ -43,6 +44,7 @@ import SubMenu, { SubMenuInstance } from './SubMenu.vue';
 import { api } from 'boot/axios';
 import { MenuItem, MenuItemAttributes } from './models';
 import { useI18n } from 'vue-i18n';
+import { useOnHover } from 'src/composables/menu';
 
 const MenuComponent = defineComponent({
   name: 'MenuDesktop',
@@ -56,9 +58,9 @@ const MenuComponent = defineComponent({
     },
   },
   setup(props) {
-    const timeout = ref<Record<number, number>>({});
     const openOnHover = toRef(props, 'openOnHover');
-    const menuEls = ref<Record<number, SubMenuInstance>>({});
+    const { menuEls, registerEl, onEnter, onLeave, cancelMenuClose } =
+      useOnHover(openOnHover);
 
     const menuTree = ref<{ item: MenuItem; el: SubMenuInstance }[]>([]);
     const menus = ref<MenuItem[]>([]);
@@ -145,34 +147,16 @@ const MenuComponent = defineComponent({
       }
     }
 
-    function onEnter(menu: MenuItem) {
-      if (openOnHover.value) {
-        closeMenu();
-        requestAnimationFrame(function () {
-          menuEls.value[menu.id]?.show();
-        });
-      }
-    }
-
-    function onLeave(menu: MenuItem) {
-      if (openOnHover.value) {
-        const el = menuEls.value[menu.id];
-        timeout.value[menu.id] = requestAnimationFrame(function () {
-          el.hide();
-        });
-      }
-    }
-
-    function cancelMenuClose(menu: MenuItem) {
-      if (timeout.value[menu.id]) {
-        cancelAnimationFrame(timeout.value[menu.id]);
-        delete timeout.value[menu.id];
+    function resetMenuTimeouts() {
+      for (const { el } of menuTree.value) {
+        el.clearTimeout();
       }
     }
 
     provide(registerMenuKey, registerMenu);
     provide(unregisterMenuKey, unregisterMenu);
     provide(closeMenuKey, closeMenu);
+    provide(resetMenuTimeoutsKey, resetMenuTimeouts);
 
     return {
       menus,
@@ -183,14 +167,19 @@ const MenuComponent = defineComponent({
       registerMenu,
       unregisterMenu,
       closeMenu,
+      registerEl,
       onEnter,
       onLeave,
       cancelMenuClose,
+      resetMenuTimeouts,
     };
   },
 });
 
 export type MenuInstance = InstanceType<typeof MenuComponent>;
+export const resetMenuTimeoutsKey: InjectionKey<
+  MenuInstance['resetMenuTimeouts']
+> = Symbol('reset-menu-timeouts-key');
 export const registerMenuKey: InjectionKey<MenuInstance['registerMenu']> =
   Symbol('register-menu-key');
 export const unregisterMenuKey: InjectionKey<MenuInstance['unregisterMenu']> =
